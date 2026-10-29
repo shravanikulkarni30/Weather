@@ -1,0 +1,272 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Station Dashboard</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .dashboard-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 25px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #245b7a;
+            margin-bottom: 10px;
+        }
+
+        form {
+            margin: 25px 0;
+        }
+
+        input[type="text"] {
+            width: 60%;
+            max-width: 350px;
+            padding: 10px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            font-size: 15px;
+        }
+
+        button {
+            padding: 10px 16px;
+            margin-left: 5px;
+            background-color: #245b7a;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #19435a;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .card {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+
+        .card h3 {
+            color: #555;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #245b7a;
+            overflow-wrap: anywhere;
+        }
+
+        #message {
+            margin: 15px 0;
+            color: #444;
+        }
+
+        #updated {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .credit {
+            margin-top: 25px;
+            font-size: 12px;
+            color: #777;
+        }
+
+        @media (max-width: 600px) {
+            .dashboard-container {
+                margin: 10px auto;
+                padding: 15px;
+            }
+
+            form {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            input[type="text"] {
+                width: 100%;
+                max-width: none;
+            }
+
+            button {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <h1>🌦️ Weather Station</h1>
+        <p>Check the weather in any city</p>
+
+        <form id="weatherForm">
+            <input
+                type="text"
+                id="location"
+                placeholder="Enter city (e.g. Pune)"
+                required
+            >
+            <button type="submit">Check Weather</button>
+        </form>
+
+        <p id="message">Enter a city to get started.</p>
+
+        <div id="weatherResult" class="card-grid" hidden>
+            <div class="card">
+                <h3>Location</h3>
+                <p class="value" id="city">--</p>
+            </div>
+
+            <div class="card">
+                <h3>Temperature</h3>
+                <p class="value"><span id="temp">--</span> °C</p>
+            </div>
+
+            <div class="card">
+                <h3>Humidity</h3>
+                <p class="value"><span id="humidity">--</span>%</p>
+            </div>
+
+            <div class="card">
+                <h3>Condition</h3>
+                <p class="value" id="status">--</p>
+            </div>
+
+            <div class="card">
+                <h3>Wind Speed</h3>
+                <p class="value"><span id="wind">--</span> km/h</p>
+            </div>
+        </div>
+
+        <p id="updated"></p>
+        <p class="credit">Weather data by Open-Meteo</p>
+    </div>
+
+    <script>
+        const form = document.getElementById('weatherForm');
+        const message = document.getElementById('message');
+        const result = document.getElementById('weatherResult');
+
+        function weatherCondition(code) {
+            if (code === 0) return 'Clear sky';
+            if ([1, 2, 3].includes(code)) return 'Partly cloudy';
+            if ([45, 48].includes(code)) return 'Foggy';
+            if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle';
+            if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code))
+                return 'Rainy';
+            if ([71, 73, 75, 77, 85, 86].includes(code))
+                return 'Snowy';
+            if ([95, 96, 99].includes(code)) return 'Thunderstorm';
+            return 'Unknown condition';
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const location = document.getElementById('location')
+                .value.trim();
+
+            if (!location) return;
+
+            message.textContent = 'Fetching weather...';
+            result.hidden = true;
+
+            try {
+                const geoURL =
+                    'https://geocoding-api.open-meteo.com/v1/search?name=' +
+                    encodeURIComponent(location) +
+                    '&count=1&language=en&format=json';
+
+                const geoResponse = await fetch(geoURL);
+
+                if (!geoResponse.ok)
+                    throw new Error('Location search failed.');
+
+                const geoData = await geoResponse.json();
+
+                if (!geoData.results || geoData.results.length === 0)
+                    throw new Error('City not found. Try another name.');
+
+                const place = geoData.results[0];
+
+                const weatherURL =
+                    `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}` +
+                    `&longitude=${place.longitude}` +
+                    '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m' +
+                    '&timezone=auto';
+
+                const weatherResponse = await fetch(weatherURL);
+
+                if (!weatherResponse.ok)
+                    throw new Error('Weather service unavailable.');
+
+                const weatherData = await weatherResponse.json();
+                const current = weatherData.current;
+
+                document.getElementById('city').textContent =
+                    place.name + (place.country ? ', ' + place.country : '');
+
+                document.getElementById('temp').textContent =
+                    current.temperature_2m;
+
+                document.getElementById('humidity').textContent =
+                    current.relative_humidity_2m;
+
+                document.getElementById('status').textContent =
+                    weatherCondition(current.weather_code);
+
+                document.getElementById('wind').textContent =
+                    current.wind_speed_10m;
+
+                document.getElementById('updated').textContent =
+                    'Weather time: ' +
+                    current.time.replace('T', ' ') +
+                    ' (' + weatherData.timezone + ')';
+
+                result.hidden = false;
+                message.textContent = 'Weather loaded successfully!';
+
+            } catch (error) {
+                message.textContent = error.message ||
+                    'Unable to fetch weather. Check your internet connection.';
+            }
+        });
+    </script>
+</body>
+</html>
